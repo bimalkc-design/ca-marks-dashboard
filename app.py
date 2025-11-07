@@ -40,9 +40,8 @@ st.markdown("---")
 # -------------------------------
 st.subheader("🔍 Select Module / Excel File")
 
-# List all CA Excel files in the folder (you can manually add files here)
+# List all CA Excel files in the folder
 excel_files = ["BTS101.CA.xlsx", "BTS306.CA.xlsx"]
-
 selected_file = st.selectbox("Select Module/Excel File", excel_files)
 
 # -------------------------------
@@ -54,10 +53,10 @@ except Exception as e:
     st.error(f"Failed to load {selected_file}: {e}")
     st.stop()
 
-# Normalize column headers (remove leading/trailing spaces)
-df.columns = df.columns.str.strip()
+# Normalize column headers (remove spaces, newlines, non-breaking spaces)
+df.columns = [str(col).strip().replace('\xa0',' ').replace('\n',' ') for col in df.columns]
 
-# Check required columns
+# Required columns
 required_cols = ["Student No", "Name", "Gender"]
 if not all(col in df.columns for col in required_cols):
     st.error(f"Excel file must contain columns: {', '.join(required_cols)}")
@@ -85,6 +84,9 @@ st.subheader("📊 Continuous Assessment Marks")
 ca_cols = [col for col in df.columns if col not in ["Student No", "Name", "Gender"]]
 marks_df = student_data[ca_cols]
 
+# Convert CA columns to numeric
+marks_df = marks_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+
 # Style table
 styled_df = marks_df.style.set_properties(
     **{
@@ -97,21 +99,17 @@ styled_df = marks_df.style.set_properties(
     {'selector': 'th', 'props': [('background-color', '#85C1E9'), ('color', 'white')]}
 ])
 
-# Display table
 st.dataframe(styled_df, use_container_width=True)
 
-# Total marks
-try:
-    total = marks_df.astype(float).sum(axis=1).values[0]
-    st.markdown(f"<h3 style='color:#CB4335'>Total CA Marks: {total}/{marks_df.shape[1]*10}</h3>", unsafe_allow_html=True)
-except:
-    st.warning("Unable to calculate total marks. Please ensure all CA columns are numeric.")
+# Total marks calculation (out of 60)
+total = marks_df.sum(axis=1).values[0]
+st.markdown(f"<h3 style='color:#CB4335'>Total CA Marks: {total}/60</h3>", unsafe_allow_html=True)
 
 # -------------------------------
 # 7️⃣ Footer
 # -------------------------------
 st.markdown("---")
 st.markdown(
-    "<p style='text-align:center; color:gray'>Developed using AI | Bimal K Chetri (PhD)</p>",
+    "<p style='text-align:center; color:gray'>Developed using AI 2025 | Bimal K Chetri (PhD)</p>",
     unsafe_allow_html=True
 )
