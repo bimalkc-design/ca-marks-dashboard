@@ -1,67 +1,75 @@
+# -------------------------------
+# app.py - CA Marks Dashboard
+# -------------------------------
+
 import streamlit as st
 import pandas as pd
 
-# ---------------------------------------------------
-# Load Excel data
-# ---------------------------------------------------
+# -------------------------------
+# 1️⃣ Page configuration
+# -------------------------------
+st.set_page_config(
+    page_title="CA Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# -------------------------------
+# 2️⃣ Header
+# -------------------------------
+st.title("Sherubtse College - CA Dashboard")
+st.markdown("View your Continuous Assessment (CA) marks here. Select your student ID from the sidebar to see your details.")
+
+# Optional: College logo (if you have a PNG file)
+# st.image("college_logo.png", width=120)
+
+st.markdown("---")  # horizontal line
+
+# -------------------------------
+# 3️⃣ Load data
+# -------------------------------
 @st.cache_data
 def load_data():
     df = pd.read_excel("CA_Marks_Dashboard.xlsx")
-    # Normalize column names for easier use
-    df.columns = [c.strip().replace(" ", "_") for c in df.columns]
     return df
 
 df = load_data()
 
-# ---------------------------------------------------
-# App Title and Intro
-# ---------------------------------------------------
-st.title("📘 Continuous Assessment Marks Dashboard")
-st.markdown("View individual student marks and performance summary")
+# -------------------------------
+# 4️⃣ Sidebar for student selection
+# -------------------------------
+st.sidebar.header("Search Your Marks")
+student_ids = df['Student No'].astype(str).tolist()
+selected_id = st.sidebar.selectbox("Select your Student No", student_ids)
 
-# ---------------------------------------------------
-# Student Selection
-# ---------------------------------------------------
-student_name = st.selectbox("Select a student:", df['Name'].sort_values())
+# Filter the dataframe for the selected student
+student_data = df[df['Student No'].astype(str) == selected_id]
 
-student = df[df['Name'] == student_name].iloc[0]
+# -------------------------------
+# 5️⃣ Display student information
+# -------------------------------
+if not student_data.empty:
+    st.subheader("Student Details")
+    st.write(f"**Name:** {student_data['Name'].values[0]}")
+    st.write(f"**Gender:** {student_data['Gender'].values[0]}")
 
-# ---------------------------------------------------
-# Student Info
-# ---------------------------------------------------
-st.subheader("Student Details")
-col1, col2 = st.columns(2)
-col1.metric("Student No", student['Student_No'])
-col2.metric("Gender", student['Gender'])
+    st.subheader("Continuous Assessment Marks")
+    st.dataframe(
+        student_data.drop(columns=['Student No', 'Name', 'Gender']),
+        use_container_width=True
+    )
 
-# ---------------------------------------------------
-# Marks Breakdown
-# ---------------------------------------------------
-st.subheader("Marks Breakdown (CA Components)")
-marks_cols = [
-    'Written_Assignment_(15)',
-    'Class_Test_(15)',
-    'Lab_Record_(10)',
-    'Presentation_(10)',
-    'Project_Report_(10)'
-]
+    # Optional: Calculate total CA marks
+    total = student_data[['Written Assignment (15)', 'Class Test (15)', 
+                          'Lab Record (10)', 'Presentation (10)', 
+                          'Project Report (10)']].sum(axis=1).values[0]
+    st.markdown(f"**Total CA Marks:** {total}/60")
+else:
+    st.warning("Student ID not found. Please select a valid ID from the sidebar.")
 
-# Display marks in table
-st.dataframe(student[marks_cols].to_frame("Marks").rename_axis("Component"))
-
-# ---------------------------------------------------
-# Calculate and Display Totals
-# ---------------------------------------------------
-total = student[marks_cols].sum()
-percentage = (total / 60) * 100
-
-st.subheader("📊 Summary")
-col1, col2 = st.columns(2)
-col1.metric("Total Marks", f"{total:.1f} / 60")
-col2.metric("Percentage", f"{percentage:.2f}%")
-
-# ---------------------------------------------------
-# Footer
-# ---------------------------------------------------
+# -------------------------------
+# 6️⃣ Footer
+# -------------------------------
 st.markdown("---")
-st.caption("Developed by Dr. Bimal Kumar Chetri | Sherubtse College")
+st.markdown("© 2025 Sherubtse College | Developed by Dr. Bimal K. Chetri")
