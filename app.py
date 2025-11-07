@@ -1,5 +1,5 @@
 # -------------------------------
-# app.py - Mobile Friendly Colored Table CA Dashboard
+# app.py - Mobile-Friendly Colored CA Dashboard
 # -------------------------------
 
 import streamlit as st
@@ -17,12 +17,11 @@ st.set_page_config(
 )
 
 # -------------------------------
-# 2️⃣ Header with logo
+# 2️⃣ Header with logo (right-aligned)
 # -------------------------------
 logo_path = "college_logo.png"
 
-# Use st.columns for text + logo alignment
-col1, col2 = st.columns([3,1])
+col1, col2 = st.columns([3, 1])  # 3:1 ratio for text and logo
 
 with col1:
     st.markdown("""
@@ -40,7 +39,7 @@ st.markdown("---")
 st.markdown("### View your Continuous Assessment (CA) marks below 👇")
 
 # -------------------------------
-# 3️⃣ Load data
+# 3️⃣ Load CA data
 # -------------------------------
 @st.cache_data
 def load_data():
@@ -49,7 +48,7 @@ def load_data():
 df = load_data()
 
 # -------------------------------
-# 4️⃣ Sidebar: select student
+# 4️⃣ Sidebar: Student search
 # -------------------------------
 st.sidebar.header("🔍 Search Your Marks")
 student_ids = df['Student No'].astype(str).tolist()
@@ -58,7 +57,7 @@ selected_id = st.sidebar.selectbox("Select your Student No", student_ids)
 student_data = df[df['Student No'].astype(str) == selected_id]
 
 # -------------------------------
-# 5️⃣ Display student info and marks table
+# 5️⃣ Display student info and colored table
 # -------------------------------
 if not student_data.empty:
     # Student Info
@@ -66,31 +65,34 @@ if not student_data.empty:
     st.markdown(f"<span style='color:#2E86C1'><b>Name:</b> {student_data['Name'].values[0]}</span>", unsafe_allow_html=True)
     st.markdown(f"<span style='color:#2E86C1'><b>Gender:</b> {student_data['Gender'].values[0]}</span>", unsafe_allow_html=True)
 
+    # CA Table
     st.subheader("📊 Continuous Assessment Marks")
 
-    # Extract CA columns
     ca_columns = ['Written Assignment (15)', 'Class Test (15)',
                   'Lab Record (10)', 'Presentation (10)', 'Project Report (10)']
     marks_df = student_data[ca_columns]
 
-    # Style the table with background color and conditional formatting
-    def color_marks(val, max_val):
-        if val >= 0.8 * max_val:
-            color = 'background-color:#27AE60; color:white'  # green
-        elif val >= 0.5 * max_val:
-            color = 'background-color:#F1C40F; color:black'  # yellow
-        else:
-            color = 'background-color:#E74C3C; color:white'  # red
-        return color
-
-    # Build style dataframe
+    # Max scores dictionary
     max_scores = [15, 15, 10, 10, 10]
-    styles = []
-    for i, col in enumerate(ca_columns):
-        styles.append(marks_df[col].apply(lambda x: color_marks(x, max_scores[i])))
+    max_dict = dict(zip(ca_columns, max_scores))
 
-    styled_df = marks_df.style.apply(lambda x: styles, axis=None)
+    # Cell coloring function
+    def color_marks(val, col):
+        max_val = max_dict[col]
+        if val >= 0.8 * max_val:
+            return 'background-color:#27AE60; color:white'  # green
+        elif val >= 0.5 * max_val:
+            return 'background-color:#F1C40F; color:black'  # yellow
+        else:
+            return 'background-color:#E74C3C; color:white'  # red
 
+    # Apply styling per column
+    styled_df = marks_df.copy()
+    for col in ca_columns:
+        styled_df[col] = styled_df[col].astype(float)
+    styled_df = styled_df.style.apply(lambda x: [color_marks(v, x.name) for v in x], axis=0)
+
+    # Display colored table
     st.dataframe(styled_df, use_container_width=True)
 
     # Total
@@ -104,4 +106,4 @@ else:
 # 6️⃣ Footer
 # -------------------------------
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:gray'>© 2025 Department of Life Science | Sherubtse College | Developed by Dr. Bimal K. Chetri</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:gray'>© 2025 Department of Life Science | Sherubtse College | Developed using AI|Bimal K. Chetri (PhD)</p>", unsafe_allow_html=True)
