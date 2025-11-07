@@ -8,8 +8,7 @@ import os
 st.set_page_config(
     page_title="CA-Dashboard",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # -------------------------------
@@ -32,22 +31,37 @@ st.markdown("---")
 st.markdown("### View your Continuous Assessment (CA) marks below 👇")
 
 # -------------------------------
-# Sidebar: Module and Student selection
+# Sidebar: Excel selection and Student ID
 # -------------------------------
-st.sidebar.header("🔍 Select Module and Student")
+st.sidebar.header("🔍 Select Module/Excel and Student")
 
-# Automatically detect Excel files in current directory
+# Auto detect Excel files
 excel_files = [f for f in os.listdir('.') if f.endswith('.xlsx')]
-module_choice = st.sidebar.selectbox("Select Module", excel_files)
+if not excel_files:
+    st.warning("No Excel files found in the folder.")
+    st.stop()
 
-# Load selected module
+module_choice = st.sidebar.selectbox("Select Module/Excel File", excel_files)
+
+# Load selected Excel file safely
 @st.cache_data
 def load_data(file_name):
-    return pd.read_excel(file_name)
+    try:
+        df = pd.read_excel(file_name)
+        return df
+    except Exception as e:
+        st.error(f"Error loading file {file_name}: {e}")
+        return pd.DataFrame()
 
 df = load_data(module_choice)
 
-# Student ID selection
+# -------------------------------
+# Student selection
+# -------------------------------
+if "Student No" not in df.columns:
+    st.error("Excel file must have 'Student No' column")
+    st.stop()
+
 student_ids = df['Student No'].astype(str).tolist()
 selected_id = st.sidebar.selectbox("Select your Student No", student_ids)
 
@@ -63,15 +77,26 @@ if not student_data.empty:
 
     st.subheader(f"📊 {module_choice.replace('.xlsx','')} Marks")
 
-    # CA columns (auto detect numeric columns after first 3 columns)
-    ca_columns = df.columns[2:]  
+    # Automatically detect CA columns (everything after first 3 columns)
+    ca_columns = df.columns[2:]
     marks_df = student_data[ca_columns]
 
-    # Max scores (customize per module if needed)
-    max_scores = [float(col.split('(')[1].replace(')','')) if '(' in col else 10 for col in ca_columns]
+    # Safe numeric conversion
+    marks_df = marks_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+
+    # Max scores detection (from column header like "Written Assignment (15)")
+    max_scores = []
+    for col in ca_columns:
+        if '(' in col and ')' in col:
+            try:
+                max_scores.append(float(col.split('(')[1].split(')')[0]))
+            except:
+                max_scores.append(10)
+        else:
+            max_scores.append(10)
     max_dict = dict(zip(ca_columns, max_scores))
 
-    # Function for coloring
+    # Coloring function
     def color_marks(val, col):
         max_val = max_dict[col]
         if val >= 0.8 * max_val:
@@ -81,15 +106,10 @@ if not student_data.empty:
         else:
             return 'background-color:#E74C3C; color:white'
 
-    # Apply styling per column
-    styled_df = marks_df.copy()
-    for col in ca_columns:
-        styled_df[col] = styled_df[col].astype(float)
-    styled_df = styled_df.style.apply(lambda x: [color_marks(v, x.name) for v in x], axis=0)
+    styled_df = marks_df.style.apply(lambda x: [color_marks(v, x.name) for v in x], axis=0)
 
     st.dataframe(styled_df, use_container_width=True)
 
-    # Total
     total = marks_df.sum(axis=1).values[0]
     st.markdown(f"<h3 style='color:#CB4335'>Total CA Marks: {total}</h3>", unsafe_allow_html=True)
 else:
