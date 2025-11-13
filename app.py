@@ -1,8 +1,7 @@
-# app.py - Sherubtse College CA Marks Dashboard
-# Hosted on: https://ca-marks-dashboard.streamlit.app
-# Admin: Dr. Bimal | Students: View only
 import streamlit as st
 import pandas as pd
+import subprocess
+import os
 
 # ================== CONFIG ==================
 st.set_page_config(
@@ -40,7 +39,6 @@ def load_data():
     return data, files
 
 data_dict, file_map = load_data()
-
 ca_components = [
     'Written Assignment (15)',
     'Class Test (15)',
@@ -49,9 +47,10 @@ ca_components = [
     'Project Report (10)'
 ]
 
-# ================== MAIN MENU BUTTONS ==================
-st.markdown("### Access Mode")
+# ================== ACCESS MODE ==================
+st.markdown("### Select Access Mode")
 col1, col2 = st.columns(2)
+role = None
 with col1:
     if st.button("👨‍🎓 Student View"):
         role = "student"
@@ -59,12 +58,11 @@ with col2:
     if st.button("👨‍🏫 Admin Login"):
         role = "admin"
 
-# Default if no button pressed
-if 'role' not in locals():
-    st.info("Select your access mode above to continue.")
+if not role:
+    st.info("Select your access mode to continue.")
     st.stop()
 
-# ================== ADMIN MODE ==================
+# ================== ADMIN ==================
 if role == "admin":
     password = st.text_input("Admin Password", type="password", help="Contact Dr. Bimal")
     if password != st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
@@ -85,31 +83,40 @@ if role == "admin":
     st.info(f"**{student['Name']}** | {student['Gender']} | {selected_student}")
 
     st.markdown("### Update CA Marks")
-    with st.form("admin_update_form"):
-        new_marks = {}
-        cols = st.columns(3)
-        max_vals = [15, 15, 10, 10, 10]
+    new_marks = {}
+    cols = st.columns(3)
+    max_vals = [15, 15, 10, 10, 10]
 
-        for i, comp in enumerate(ca_components):
-            with cols[i % 3]:
-                current = student[comp]
-                if pd.isna(current): current = 0
-                new_marks[comp] = st.number_input(
-                    comp, min_value=0, max_value=max_vals[i],
-                    value=int(current), step=1
-                )
+    for i, comp in enumerate(ca_components):
+        with cols[i % 3]:
+            current = student[comp]
+            if pd.isna(current): current = 0
+            new_marks[comp] = st.number_input(
+                comp, min_value=0, max_value=max_vals[i],
+                value=int(current), step=1
+            )
 
-        submitted = st.form_submit_button("💾 Save Marks")
+    if st.button("💾 Save & Push Changes"):
+        for comp, val in new_marks.items():
+            df.at[row_idx, comp] = val
+        df.to_excel(filename, index=False)
 
-        if submitted:
-            for comp, val in new_marks.items():
-                df.at[row_idx, comp] = val
-            df.to_excel(filename, index=False)
-            st.success(f"Marks updated for {student['Name']} in {module_name}")
-            st.balloons()
-            st.cache_data.clear()
+        # ================== GIT AUTOMATION ==================
+        try:
+            git_token = st.secrets.get("GITHUB_PAT")
+            repo_url = f"https://{git_token}@github.com/bimalkc-design/ca-marks-dashboard.git"
 
-# ================== STUDENT MODE ==================
+            subprocess.run(["git", "add", filename], check=True)
+            subprocess.run(["git", "commit", "-m", f"Update {selected_student} marks in {module_name}"], check=True)
+            subprocess.run(["git", "push", repo_url, "main"], check=True)
+            st.success(f"Marks updated and pushed to GitHub for {student['Name']}")
+        except subprocess.CalledProcessError as e:
+            st.error(f"Git push failed: {e}")
+
+        st.balloons()
+        st.cache_data.clear()
+
+# ================== STUDENT ==================
 else:
     module_name = st.selectbox("Select Module", list(data_dict.keys()))
     df = data_dict[module_name]
@@ -125,7 +132,6 @@ else:
                 student = df[df["Student No"] == student_no_input].iloc[0]
                 st.success(f"Welcome, **{student['Name']}** ({student['Gender']})")
 
-                st.markdown("### Your CA Marks")
                 total = 0
                 marks_data = []
                 for comp in ca_components:
@@ -133,8 +139,7 @@ else:
                     max_mark = int(comp.split("(")[1].split(")")[0])
                     total += marks
                     marks_data.append((comp, marks, max_mark, f"{marks}/{max_mark}"))
-                
-                # Display table with colors
+
                 st.table(pd.DataFrame(marks_data, columns=["Component", "Marks Obtained", "Max Marks", "Score"]))
 
                 st.markdown(f"""
