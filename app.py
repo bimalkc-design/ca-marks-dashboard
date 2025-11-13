@@ -1,7 +1,4 @@
-# app.py - Sherubtse College CA Marks Dashboard (Responsive Version)
-# Hosted on: https://ca-marks-dashboard.streamlit.app
-# Admin access: password-protected
-
+# app.py - Sherubtse College CA Dashboard (Modern UI)
 import streamlit as st
 import pandas as pd
 
@@ -9,23 +6,29 @@ import pandas as pd
 st.set_page_config(
     page_title="Sherubtse CA Marks",
     page_icon="📊",
-    layout="wide",               # Wide layout for PC and mobile
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ================== HEADER ==================
 st.markdown("""
-<div style="text-align:center; background:#1F618D; padding:20px; border-radius:15px; margin-bottom:30px; max-width:90%; margin-left:auto; margin-right:auto;">
-    <h1 style="color:white; margin:0; font-size:2em">Sherubtse College</h1>
-    <h2 style="color:#D6EAF8; margin:5px; font-size:1.2em">Department of Life Science</h2>
-    <h3 style="color:white; font-size:1em">Continuous Assessment Dashboard</h3>
-    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="80%">
+<div style="
+    text-align:center; 
+    background: linear-gradient(90deg, #1F618D, #2874A6);
+    padding:25px; 
+    border-radius:15px; 
+    margin-bottom:30px;
+    color:white;
+">
+    <h1 style="margin:0; font-size:2.2em">Sherubtse College</h1>
+    <h3 style="margin:5px; font-size:1.2em">Department of Life Science</h3>
+    <h4 style="margin:5px; font-size:1em">Continuous Assessment Dashboard</h4>
+    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="120px" style="margin-top:10px; border-radius:10px;">
 </div>
 """, unsafe_allow_html=True)
 
 # ================== ADMIN LOGIN ==================
-# Admin login input (hidden to students)
-admin_password = st.sidebar.text_input("Admin Password", type="password", placeholder="Enter password", help="Contact Dr. Bimal")
+admin_password = st.sidebar.text_input("Admin Password", type="password", placeholder="Enter password")
 is_admin = False
 if admin_password:
     if admin_password == st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
@@ -67,7 +70,7 @@ ca_components = [
 
 # ================== ADMIN MODE ==================
 if is_admin:
-    st.success("Admin Mode Active")
+    st.success("Admin Mode Active ✅")
     student_list = df["Student No"].tolist()
     selected_student = st.selectbox("Select Student to Update", student_list, index=0)
 
@@ -78,11 +81,11 @@ if is_admin:
 
     with st.form("admin_update_form"):
         new_marks = {}
-        cols = st.columns(3)
+        cols = st.columns(2)
         max_vals = [15, 15, 10, 10, 10]
 
         for i, comp in enumerate(ca_components):
-            with cols[i % 3]:
+            with cols[i % 2]:
                 current = student[comp]
                 if pd.isna(current): current = 0
                 new_marks[comp] = st.number_input(
@@ -90,12 +93,12 @@ if is_admin:
                     value=int(current), step=1
                 )
 
-        submitted = st.form_submit_button("SAVE MARKS TO EXCEL FILE")
+        submitted = st.form_submit_button("💾 Save Marks")
         if submitted:
             for comp, val in new_marks.items():
                 df.at[row_idx, comp] = val
             df.to_excel(filename, index=False)
-            st.success(f"Marks updated for {student['Name']} in {module_name}")
+            st.success(f"Marks updated for {student['Name']} in {module_name} 🎉")
             st.balloons()
             st.cache_data.clear()
 
@@ -110,27 +113,43 @@ else:
         st.stop()
 
     student = df[df["Student No"] == student_no].iloc[0]
-    st.success(f"Welcome, **{student['Name']}** ({student['Gender']})")
+    st.success(f"Welcome, **{student['Name']}** ({student['Gender']}) 🎓")
 
     st.markdown("### Your CA Marks")
     total = 0
-    cols = st.columns(3)
     for i, comp in enumerate(ca_components):
-        marks = student[comp]
-        if pd.isna(marks): marks = 0
-        marks = int(marks)
-        total += marks
+        marks = student[comp] if pd.notna(student[comp]) else 0
+        total += int(marks)
         max_mark = int(comp.split("(")[1].split(")")[0])
-        with cols[i % 3]:
-            delta = f"{marks}/{max_mark}"
-            st.metric(comp, marks, delta)
+        st.markdown(f"""
+        <div style="
+            background:#E8F6F3; 
+            padding:15px; 
+            border-radius:10px; 
+            margin-bottom:10px; 
+            display:flex; 
+            justify-content:space-between;
+            font-size:1.1em;
+        ">
+            <span>{comp}</span>
+            <span style="font-weight:bold">{marks}/{max_mark}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown(f"""
-    <div style="text-align:center; margin:20px; padding:15px; background:#D6EAF8; border-radius:15px">
-        <h2 style="color:#CB4335; margin:0">Total CA Marks: {total}/60</h2>
+    <div style="
+        text-align:center; 
+        margin-top:20px; 
+        padding:20px; 
+        background:#D6EAF8; 
+        border-radius:15px;
+        font-size:1.3em;
+        font-weight:bold;
+    ">
+        Total CA Marks: {total}/60 🏆
     </div>
-    """, unsafe_allow_html=True)
+    """ , unsafe_allow_html=True)
 
 # ================== FOOTER ==================
 st.markdown("---")
-st.caption("Developed using AI tool by Bimal K Chetri (PhD) | Sherubtse College | 2025 | Hosted on GitHub + Streamlit")
+st.caption("Developed by Dr. Bimal K Chetri | Sherubtse College | 2025 | Hosted on GitHub + Streamlit")
