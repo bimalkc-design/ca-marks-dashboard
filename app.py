@@ -1,4 +1,3 @@
-cat > app.py <<'PY'
 # --------------------------------------------------------------
 #  Sherubtse College – Continuous Assessment Dashboard
 #  Author: Dr. Bimal K Chetri (PhD) – 2025
@@ -13,52 +12,52 @@ from datetime import datetime
 
 # ===================== CONFIG =====================
 st.set_page_config(
-    page_title="Sherubtse CA Marks",
-    page_icon="Chart",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Sherubtse CA Dashboard",
+    page_icon="📊",
+    layout="wide"
 )
 
-ACCENT = "#1F618D"
-WARN   = "#CB4335"
-CARD   = "#FFFFFF"
+ACCENT = "#0D47A1"   # Deep blue
+SECOND = "#42A5F5"   # Light blue
+WARN   = "#C62828"   # Red
+CARD   = "#F9FAFB"   # Card background
 
 REPO_DIR = Path(__file__).parent
 os.chdir(REPO_DIR)
 
-# ===================== GIT HELPERS (SSH) =====================
+# ===================== GIT HELPERS =====================
 def git_pull():
     try:
-        result = subprocess.run(["git", "pull", "origin", "main"], 
-                              capture_output=True, text=True, check=True)
-        if "Already up to date" not in result.stdout:
-            st.toast("Synced with GitHub")
+        subprocess.run(["git", "pull", "origin", "main"], check=True, capture_output=True)
+        st.toast("✅ Synced with GitHub")
     except Exception:
-        st.warning("Git pull failed (offline or conflict)")
+        st.warning("⚠️ Git pull failed (offline or conflict)")
 
 def git_push(file_path: Path, msg: str):
     try:
-        subprocess.run(["git", "add", str(file_path)], check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", msg], check=True, capture_output=True)
-        subprocess.run(["git", "push", "origin", "main"], check=True, capture_output=True)
-        st.success(f"Pushed: {msg}")
-    except subprocess.CalledProcessError as e:
-        err = e.stderr.decode() if e.stderr else str(e)
-        st.error(f"Push failed: {err}")
-        raise
+        subprocess.run(["git", "add", str(file_path)], check=True)
+        subprocess.run(["git", "commit", "-m", msg], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+        st.success("✅ Data saved & pushed to GitHub")
+    except Exception as e:
+        st.error(f"❌ Push failed: {e}")
 
 # ===================== HEADER =====================
-logo_path = REPO_DIR / "college_logo.png"
-if logo_path.exists():
-    st.image(str(logo_path), width=100)
+if (REPO_DIR / "college_logo.png").exists():
+    st.image("college_logo.png", width=120)
+
 st.markdown(
-    f"<h1 style='text-align:center; color:{ACCENT};'>Sherubtse College</h1>"
-    "<h2 style='text-align:center; color:#555;'>Department of Life Science</h2>"
-    "<h3 style='text-align:center; color:#333;'>Continuous Assessment Dashboard</h3>",
+    f"""
+    <div style="text-align:center;">
+        <h1 style="color:{ACCENT}; margin-bottom:0;">Sherubtse College</h1>
+        <h3 style="color:#555;">Department of Life Sciences</h3>
+        <h4 style="color:#333;">Continuous Assessment Dashboard</h4>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 
-# ===================== DATA LOADING =====================
+# ===================== DATA =====================
 @st.cache_data(ttl=60)
 def load_data():
     files = {
@@ -66,148 +65,103 @@ def load_data():
         "BTS306 - Plant Breeding & Horticulture (3rd Year)": "BTS306.CA.xlsx"
     }
     data = {}
-    for name, fn in files.items():
+    for k, f in files.items():
         try:
-            df = pd.read_excel(fn)
+            df = pd.read_excel(f)
             df.columns = [c.strip() for c in df.columns]
-            df["Student No"] = df["Student No"].astype(int).astype(str).str.zfill(8)
-            data[name] = df
+            df["Student No"] = df["Student No"].astype(str).str.strip().str.zfill(8)
+            data[k] = df
         except Exception as e:
-            st.error(f"Failed to load **{fn}**: {e}")
+            st.error(f"Error loading {f}: {e}")
     return data, files
 
 data_dict, file_map = load_data()
-ca_components = [
-    'Written Assignment (15)', 'Class Test (15)', 'Lab Record (10)',
-    'Presentation (10)', 'Project Report (10)'
-]
-max_vals = [15, 15, 10, 10, 10]
+components = ['Written Assignment (15)', 'Class Test (15)', 'Lab Record (10)', 
+              'Presentation (10)', 'Project Report (10)']
+max_marks = [15, 15, 10, 10, 10]
 
-git_pull()  # Sync on start
+git_pull()
 
 # ===================== ACCESS MODE =====================
-st.markdown("### Choose Access Mode")
+st.markdown("---")
+st.markdown("### 🔑 Choose Access Mode")
+
 c1, c2 = st.columns(2)
 role = None
 with c1:
-    if st.button("Student View", use_container_width=True):
+    if st.button("👨‍🎓 Student View", use_container_width=True):
         role = "student"
 with c2:
-    if st.button("Admin Login", use_container_width=True):
+    if st.button("🧑‍🏫 Admin Access", use_container_width=True):
         role = "admin"
 
 if not role:
-    st.info("Please select your access mode.")
     st.stop()
 
-# ===================== ADMIN SECTION =====================
+# ===================== ADMIN PANEL =====================
 if role == "admin":
-    pwd = st.text_input("Admin Password", type="password")
+    pwd = st.text_input("Enter Admin Password", type="password")
     if pwd != st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
         st.error("Incorrect password")
         st.stop()
 
-    st.success("Admin access granted")
-    module = st.selectbox("Module", list(data_dict.keys()))
-    df = data_dict[module].copy()
-    excel_file = Path(file_map[module])
+    st.success("Admin access granted ✅")
 
-    st.markdown("#### Edit All Students")
+    module = st.selectbox("Select Module", list(data_dict.keys()))
+    df = data_dict[module].copy()
+    file = Path(file_map[module])
+
+    st.markdown("#### ✏️ Edit Marks Table")
     edited = st.data_editor(
         df,
         num_rows="dynamic",
+        use_container_width=True,
         column_config={
-            "Student No": st.column_config.TextColumn(required=True),
-            "Name": st.column_config.TextColumn(required=True),
-            "Gender": st.column_config.SelectboxColumn("Gender", options=["M", "F", "Other"], required=True),
-            **{c: st.column_config.NumberColumn(c, min_value=0, max_value=m) for c, m in zip(ca_components, max_vals)}
+            "Student No": st.column_config.TextColumn("Student No"),
+            "Name": st.column_config.TextColumn("Student Name"),
+            "Gender": st.column_config.SelectboxColumn("Gender", options=["M", "F", "Other"]),
+            **{c: st.column_config.NumberColumn(c, min_value=0, max_value=m) for c, m in zip(components, max_marks)}
         },
-        use_container_width=True
+        height=450
     )
 
-    col_save, col_log = st.columns([1, 2])
-    with col_save:
-        if st.button("Save & Push to GitHub", type="primary", use_container_width=True):
-            edited.to_excel(excel_file, index=False)
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-            msg = f"Admin update – {module} – {ts}"
-            try:
-                git_push(excel_file, msg)
-                st.cache_data.clear()
-                st.rerun()
-            except:
-                pass  # error already shown
+    if st.button("💾 Save & Push Updates", type="primary", use_container_width=True):
+        edited.to_excel(file, index=False)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        msg = f"Admin update – {module} – {ts}"
+        git_push(file, msg)
+        st.cache_data.clear()
+        st.rerun()
 
-    with col_log:
-        st.markdown("#### Recent Commits")
-        try:
-            log = subprocess.check_output(["git", "log", "--oneline", "-8"], text=True).strip().split("\n")
-            for line in log:
-                if line.strip():
-                    sha, *rest = line.split(" ", 1)
-                    msg = rest[0] if rest else ""
-                    st.caption(f"`{sha[:7]}` {msg}")
-        except:
-            st.caption("Log unavailable")
-
-    st.markdown("---")
-    st.markdown("#### Quick Edit (Single Student)")
-    sel_stu = st.selectbox("Select Student", edited["Student No"].tolist(), key="quick")
-    row_idx = edited[edited["Student No"] == sel_stu].index[0]
-    stu = edited.loc[row_idx]
-
-    cols = st.columns(3)
-    new_marks = {}
-    for i, comp in enumerate(ca_components):
-        with cols[i % 3]:
-            cur = stu[comp] if pd.notna(stu[comp]) else 0
-            new_marks[comp] = st.number_input(comp, min_value=0, max_value=max_vals[i], value=int(cur), step=1, key=f"m{i}")
-
-    if st.button("Update This Student"):
-        for c, v in new_marks.items():
-            edited.at[row_idx, c] = v
-        edited.to_excel(excel_file, index=False)
-        msg = f"Quick edit: {stu['Name']} ({sel_stu})"
-        try:
-            git_push(excel_file, msg)
-            st.success("Updated!")
-            st.cache_data.clear()
-            st.rerun()
-        except:
-            pass
-
-# ===================== STUDENT SECTION =====================
+# ===================== STUDENT PANEL =====================
 else:
-    module = st.selectbox("Module", list(data_dict.keys()))
+    module = st.selectbox("📘 Select Your Module", list(data_dict.keys()))
     df = data_dict[module]
 
-    st.markdown("### Enter Your Student No")
+    st.markdown("#### 🎯 Enter Your Student Number")
     stu_no = st.text_input("", placeholder="e.g. 07250087", key="id").strip().zfill(8)
 
-    if stu_no and st.button("View My Marks", use_container_width=True):
+    if st.button("🔍 View My Marks", type="primary", use_container_width=True):
         if stu_no not in df["Student No"].values:
-            st.error("Student No not found.")
+            st.error("Student No not found. Please check and try again.")
         else:
             stu = df[df["Student No"] == stu_no].iloc[0]
             st.success(f"**{stu['Name']}** – {stu['Gender']} – `{stu_no}`")
 
             total = 0
-            for comp in ca_components:
+            for comp in components:
                 mark = int(stu[comp]) if pd.notna(stu[comp]) else 0
                 max_m = int(comp.split("(")[1].split(")")[0])
                 total += mark
-                prog = mark / max_m if max_m > 0 else 0
-                st.markdown(f"**{comp.split(' (')[0]}**")
-                st.progress(prog)
-                st.caption(f"{mark} / {max_m}")
+                st.markdown(f"**{comp.split(' (')[0]}** ({mark}/{max_m})")
+                st.progress(mark / max_m if max_m > 0 else 0)
 
             st.markdown(
                 f"""
-                <div style="text-align:center; margin:30px 0; padding:20px;
-                            background:{CARD}; border-radius:15px;
-                            box-shadow:0 4px 12px rgba(0,0,0,0.1)">
-                    <h2 style="color:{ACCENT}; margin:0">Total CA Marks</h2>
-                    <h1 style="color:{WARN}; margin:5px 0">{total}<small style="font-size:0.6em">/60</small></h1>
+                <div style="background:{CARD}; padding:20px; border-radius:15px; 
+                            text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-top:20px;">
+                    <h3 style="color:{ACCENT}; margin:0;">Total CA Marks</h3>
+                    <h1 style="color:{WARN}; margin:5px 0;">{total} <span style="font-size:0.6em;">/ 60</span></h1>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -215,4 +169,4 @@ else:
 
 # ===================== FOOTER =====================
 st.markdown("---")
-st.caption("Developed using AI tool by Bimal K Chetri (PhD) | Sherubtse College | 2025")
+st.caption("Developed by Dr. Bimal K. Chetri (PhD) | Sherubtse College | 2025")
