@@ -1,6 +1,7 @@
-# app.py - Sherubtse College CA Marks Dashboard
+# app.py - Sherubtse College CA Marks Dashboard (Responsive Version)
 # Hosted on: https://ca-marks-dashboard.streamlit.app
-# Admin: bimal@123 | Students: View only
+# Admin access: password-protected
+
 import streamlit as st
 import pandas as pd
 
@@ -8,36 +9,30 @@ import pandas as pd
 st.set_page_config(
     page_title="Sherubtse CA Marks",
     page_icon="📊",
-    layout="centered"
+    layout="wide",               # Wide layout for PC and mobile
+    initial_sidebar_state="collapsed"
 )
 
 # ================== HEADER ==================
 st.markdown("""
-<div style="text-align:center; background:#1F618D; padding:20px; border-radius:15px; margin-bottom:30px">
-    <h1 style="color:white; margin:0">Sherubtse College</h1>
-    <h2 style="color:#D6EAF8; margin:5px">Department of Life Science</h2>
-    <h3 style="color:white">Continuous Assessment Dashboard</h3>
-    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="100">
+<div style="text-align:center; background:#1F618D; padding:20px; border-radius:15px; margin-bottom:30px; max-width:90%; margin-left:auto; margin-right:auto;">
+    <h1 style="color:white; margin:0; font-size:2em">Sherubtse College</h1>
+    <h2 style="color:#D6EAF8; margin:5px; font-size:1.2em">Department of Life Science</h2>
+    <h3 style="color:white; font-size:1em">Continuous Assessment Dashboard</h3>
+    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="80%">
 </div>
 """, unsafe_allow_html=True)
 
-# ================== LOGIN SYSTEM ==================
-role = st.sidebar.radio("**Access Mode**", ["👨‍🎓 Student (View Marks)", "👨‍🏫 Admin (Enter Marks)"])
-
-# ------------------- ADMIN LOGIN -------------------
-if role == "👨‍🏫 Admin (Enter Marks)":
-    password = st.sidebar.text_input("Admin Password", type="password", help="Contact Dr. Bimal")
-    if password != st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
+# ================== ADMIN LOGIN ==================
+# Admin login input (hidden to students)
+admin_password = st.sidebar.text_input("Admin Password", type="password", placeholder="Enter password", help="Contact Dr. Bimal")
+is_admin = False
+if admin_password:
+    if admin_password == st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
+        is_admin = True
+        st.sidebar.success("Admin access granted")
+    else:
         st.sidebar.error("Incorrect password")
-        st.stop()
-    st.sidebar.success("Admin access granted")
-
-# ------------------- STUDENT LOGIN -------------------
-else:
-    student_no = st.sidebar.text_input("Your Student No", placeholder="e.g. 2021001")
-    if not student_no:
-        st.info("Please enter your Student No in the sidebar to continue.")
-        st.stop()
 
 # ================== LOAD DATA ==================
 @st.cache_data
@@ -70,8 +65,8 @@ ca_components = [
     'Project Report (10)'
 ]
 
-# ================== ADMIN: ENTER MARKS ==================
-if role == "👨‍🏫 Admin (Enter Marks)":
+# ================== ADMIN MODE ==================
+if is_admin:
     st.success("Admin Mode Active")
     student_list = df["Student No"].tolist()
     selected_student = st.selectbox("Select Student to Update", student_list, index=0)
@@ -96,7 +91,6 @@ if role == "👨‍🏫 Admin (Enter Marks)":
                 )
 
         submitted = st.form_submit_button("SAVE MARKS TO EXCEL FILE")
-
         if submitted:
             for comp, val in new_marks.items():
                 df.at[row_idx, comp] = val
@@ -105,8 +99,12 @@ if role == "👨‍🏫 Admin (Enter Marks)":
             st.balloons()
             st.cache_data.clear()
 
-# ================== STUDENT: VIEW MARKS ==================
+# ================== STUDENT VIEW ==================
 else:
+    student_no = st.text_input("Enter Your Student No", placeholder="e.g. 2021001")
+    if not student_no:
+        st.info("Please enter your Student No to continue.")
+        st.stop()
     if student_no not in df["Student No"].values:
         st.error("Student No not found. Please check and try again.")
         st.stop()
@@ -128,7 +126,7 @@ else:
             st.metric(comp, marks, delta)
 
     st.markdown(f"""
-    <div style="text-align:center; margin:30px; padding:20px; background:#D6EAF8; border-radius:15px">
+    <div style="text-align:center; margin:20px; padding:15px; background:#D6EAF8; border-radius:15px">
         <h2 style="color:#CB4335; margin:0">Total CA Marks: {total}/60</h2>
     </div>
     """, unsafe_allow_html=True)
