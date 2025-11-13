@@ -1,4 +1,4 @@
-# app.py - Sherubtse College CA Dashboard (Modern UI)
+# app.py - Sherubtse College CA Dashboard (Attractive & Responsive)
 import streamlit as st
 import pandas as pd
 
@@ -23,7 +23,8 @@ st.markdown("""
     <h1 style="margin:0; font-size:2.2em">Sherubtse College</h1>
     <h3 style="margin:5px; font-size:1.2em">Department of Life Science</h3>
     <h4 style="margin:5px; font-size:1em">Continuous Assessment Dashboard</h4>
-    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="120px" style="margin-top:10px; border-radius:10px;">
+    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" 
+         width="120px" style="margin-top:10px; border-radius:10px;">
 </div>
 """, unsafe_allow_html=True)
 
@@ -40,9 +41,10 @@ if admin_password:
 # ================== LOAD DATA ==================
 @st.cache_data
 def load_data():
+    # Descriptive module names with year
     files = {
-        "BTS101 - Life Science": "BTS101.CA.xlsx",
-        "BTS306 - Advanced Biology": "BTS306.CA.xlsx"
+        "BTS101 - Algae and Fungi (1st Year)": "BTS101.CA.xlsx",
+        "BTS306 - Plant Breeding & Horticulture (3rd Year)": "BTS306.CA.xlsx"
     }
     data = {}
     for name, file in files.items():
@@ -115,24 +117,41 @@ else:
     student = df[df["Student No"] == student_no].iloc[0]
     st.success(f"Welcome, **{student['Name']}** ({student['Gender']}) 🎓")
 
-    st.markdown("### Your CA Marks")
+    st.markdown(f"### Module: **{module_name}**")
+
+    # Display CA marks as cards with progress bars
     total = 0
-    for i, comp in enumerate(ca_components):
-        marks = student[comp] if pd.notna(student[comp]) else 0
-        total += int(marks)
+    for comp in ca_components:
+        marks = int(student[comp]) if pd.notna(student[comp]) else 0
+        total += marks
         max_mark = int(comp.split("(")[1].split(")")[0])
+        percentage = int((marks / max_mark) * 100)
+
         st.markdown(f"""
         <div style="
             background:#E8F6F3; 
             padding:15px; 
-            border-radius:10px; 
-            margin-bottom:10px; 
-            display:flex; 
-            justify-content:space-between;
-            font-size:1.1em;
+            border-radius:12px; 
+            margin-bottom:12px;
         ">
-            <span>{comp}</span>
-            <span style="font-weight:bold">{marks}/{max_mark}</span>
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>{comp}</span>
+                <span>{marks}/{max_mark}</span>
+            </div>
+            <div style="
+                background:#D5DBDB; 
+                border-radius:10px; 
+                height:12px; 
+                margin-top:5px;
+            ">
+                <div style="
+                    background:#2874A6; 
+                    width:{percentage}%; 
+                    height:100%; 
+                    border-radius:10px;
+                    transition: width 0.5s;
+                "></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -152,4 +171,5 @@ else:
 
 # ================== FOOTER ==================
 st.markdown("---")
-st.caption("Developed by Dr. Bimal K Chetri | Sherubtse College | 2025 | Hosted on GitHub + Streamlit")
+st.caption("Developed using AI tool by Bimal K Chetri (PhD) | Sherubtse College | 2025 | Hosted on GitHub + Streamlit")
+
