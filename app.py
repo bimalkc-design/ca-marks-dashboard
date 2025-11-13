@@ -1,4 +1,7 @@
-# app.py - Sherubtse College CA Dashboard (Attractive & Responsive)
+# app.py - Sherubtse College CA Marks Dashboard
+# Hosted on: https://ca-marks-dashboard.streamlit.app
+# Admin: Dr. Bimal | Students: View only
+
 import streamlit as st
 import pandas as pd
 
@@ -6,42 +9,40 @@ import pandas as pd
 st.set_page_config(
     page_title="Sherubtse CA Marks",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
 # ================== HEADER ==================
 st.markdown("""
-<div style="
-    text-align:center; 
-    background: linear-gradient(90deg, #1F618D, #2874A6);
-    padding:25px; 
-    border-radius:15px; 
-    margin-bottom:30px;
-    color:white;
-">
-    <h1 style="margin:0; font-size:2.2em">Sherubtse College</h1>
-    <h3 style="margin:5px; font-size:1.2em">Department of Life Science</h3>
-    <h4 style="margin:5px; font-size:1em">Continuous Assessment Dashboard</h4>
-    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" 
-         width="120px" style="margin-top:10px; border-radius:10px;">
+<div style="text-align:center; background:#1F618D; padding:20px; border-radius:15px; margin-bottom:30px">
+    <h1 style="color:white; margin:0">Sherubtse College</h1>
+    <h2 style="color:#D6EAF8; margin:5px">Department of Life Science</h2>
+    <h3 style="color:white">Continuous Assessment Dashboard</h3>
+    <img src="https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/college_logo.png" width="100">
 </div>
 """, unsafe_allow_html=True)
 
-# ================== ADMIN LOGIN ==================
-admin_password = st.sidebar.text_input("Admin Password", type="password", placeholder="Enter password")
-is_admin = False
-if admin_password:
-    if admin_password == st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
-        is_admin = True
-        st.sidebar.success("Admin access granted")
-    else:
+# ================== LOGIN SYSTEM ==================
+role = st.sidebar.radio("**Access Mode**", ["👨‍🎓 Student (View Marks)", "👨‍🏫 Admin (Enter Marks)"])
+
+# ------------------- ADMIN LOGIN -------------------
+if role == "👨‍🏫 Admin (Enter Marks)":
+    password = st.sidebar.text_input("Admin Password", type="password", help="Contact Dr. Bimal")
+    if password != st.secrets.get("ADMIN_PASSWORD", "bimal@123"):
         st.sidebar.error("Incorrect password")
+        st.stop()
+    st.sidebar.success("Admin access granted")
+
+# ------------------- STUDENT LOGIN -------------------
+else:
+    student_no = st.sidebar.text_input("Enter Your Student No", placeholder="e.g. 07250087")
+    if not student_no:
+        st.info("Please enter your Student No in the sidebar to continue.")
+        st.stop()
 
 # ================== LOAD DATA ==================
 @st.cache_data
 def load_data():
-    # Descriptive module names with year
     files = {
         "BTS101 - Algae and Fungi (1st Year)": "BTS101.CA.xlsx",
         "BTS306 - Plant Breeding & Horticulture (3rd Year)": "BTS306.CA.xlsx"
@@ -51,13 +52,17 @@ def load_data():
         try:
             df = pd.read_excel(file)
             df.columns = [str(c).strip() for c in df.columns]
-            df["Student No"] = df["Student No"].astype(str)
+            
+            # Ensure Student No is string with leading zeros (8 digits)
+            df["Student No"] = df["Student No"].astype(int).astype(str).str.zfill(8)
+            
             data[name] = df
-        except:
-            st.error(f"Could not load {file}")
+        except Exception as e:
+            st.error(f"Could not load {file}: {e}")
     return data, files
 
 data_dict, file_map = load_data()
+
 module_name = st.selectbox("Select Module", list(data_dict.keys()))
 df = data_dict[module_name]
 filename = file_map[module_name]
@@ -70,9 +75,9 @@ ca_components = [
     'Project Report (10)'
 ]
 
-# ================== ADMIN MODE ==================
-if is_admin:
-    st.success("Admin Mode Active ✅")
+# ================== ADMIN: ENTER MARKS ==================
+if role == "👨‍🏫 Admin (Enter Marks)":
+    st.success("Admin Mode Active")
     student_list = df["Student No"].tolist()
     selected_student = st.selectbox("Select Student to Update", student_list, index=0)
 
@@ -83,11 +88,11 @@ if is_admin:
 
     with st.form("admin_update_form"):
         new_marks = {}
-        cols = st.columns(2)
+        cols = st.columns(3)
         max_vals = [15, 15, 10, 10, 10]
 
         for i, comp in enumerate(ca_components):
-            with cols[i % 2]:
+            with cols[i % 3]:
                 current = student[comp]
                 if pd.isna(current): current = 0
                 new_marks[comp] = st.number_input(
@@ -95,81 +100,45 @@ if is_admin:
                     value=int(current), step=1
                 )
 
-        submitted = st.form_submit_button("💾 Save Marks")
+        submitted = st.form_submit_button("SAVE MARKS TO EXCEL FILE")
+
         if submitted:
             for comp, val in new_marks.items():
                 df.at[row_idx, comp] = val
             df.to_excel(filename, index=False)
-            st.success(f"Marks updated for {student['Name']} in {module_name} 🎉")
+            st.success(f"Marks updated for {student['Name']} in {module_name}")
             st.balloons()
             st.cache_data.clear()
 
-# ================== STUDENT VIEW ==================
+# ================== STUDENT: VIEW MARKS ==================
 else:
-    student_no = st.text_input("Enter Your Student No", placeholder="e.g. 2021001")
-    if not student_no:
-        st.info("Please enter your Student No to continue.")
-        st.stop()
     if student_no not in df["Student No"].values:
         st.error("Student No not found. Please check and try again.")
         st.stop()
 
     student = df[df["Student No"] == student_no].iloc[0]
-    st.success(f"Welcome, **{student['Name']}** ({student['Gender']}) 🎓")
+    st.success(f"Welcome, **{student['Name']}** ({student['Gender']})")
 
-    st.markdown(f"### Module: **{module_name}**")
-
-    # Display CA marks as cards with progress bars
+    st.markdown("### Your CA Marks")
     total = 0
-    for comp in ca_components:
-        marks = int(student[comp]) if pd.notna(student[comp]) else 0
+    cols = st.columns(3)
+    for i, comp in enumerate(ca_components):
+        marks = student[comp]
+        if pd.isna(marks): marks = 0
+        marks = int(marks)
         total += marks
         max_mark = int(comp.split("(")[1].split(")")[0])
-        percentage = int((marks / max_mark) * 100)
-
-        st.markdown(f"""
-        <div style="
-            background:#E8F6F3; 
-            padding:15px; 
-            border-radius:12px; 
-            margin-bottom:12px;
-        ">
-            <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                <span>{comp}</span>
-                <span>{marks}/{max_mark}</span>
-            </div>
-            <div style="
-                background:#D5DBDB; 
-                border-radius:10px; 
-                height:12px; 
-                margin-top:5px;
-            ">
-                <div style="
-                    background:#2874A6; 
-                    width:{percentage}%; 
-                    height:100%; 
-                    border-radius:10px;
-                    transition: width 0.5s;
-                "></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        with cols[i % 3]:
+            delta = f"{marks}/{max_mark}"
+            st.metric(comp, marks, delta)
+            st.progress(marks/max_mark)  # Show progress bar for each component
 
     st.markdown(f"""
-    <div style="
-        text-align:center; 
-        margin-top:20px; 
-        padding:20px; 
-        background:#D6EAF8; 
-        border-radius:15px;
-        font-size:1.3em;
-        font-weight:bold;
-    ">
-        Total CA Marks: {total}/60 🏆
+    <div style="text-align:center; margin:30px; padding:20px; background:#D6EAF8; border-radius:15px">
+        <h2 style="color:#CB4335; margin:0">Total CA Marks: {total}/60</h2>
     </div>
-    """ , unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 # ================== FOOTER ==================
 st.markdown("---")
 st.caption("Developed using AI tool by Bimal K Chetri (PhD) | Sherubtse College | 2025 | Hosted on GitHub + Streamlit")
-
