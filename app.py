@@ -1,94 +1,127 @@
+cat > app.py <<'PY'
+# app.py – Student Self-Service CA Dashboard (WSL / Local Excel)
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+import plotly.express as px
+import os, re
 
-# ========================
-# Streamlit Page Config
-# ========================
+# ----------------------
+# Page config (wide = mobile-friendly)
+# ----------------------
 st.set_page_config(
-    page_title="College CA Dashboard",
-    page_icon=":bar_chart:",
-    layout="centered",
+    page_title="CNR CA Dashboard",
+    page_icon="🌾",
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ========================
-# App Header
-# ========================
-st.markdown(
-    """
-    <div style="text-align: center; background-color: #4CAF50; padding: 15px; border-radius: 10px;">
-        <h1 style="color: white;">Department of Life Sciences</h1>
-        <h2 style="color: white;">College CA Dashboard</h2>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# ----------------------
+# Responsive CSS
+# ----------------------
+st.markdown("""
+<style>
+    .main {background:#f0f8ff;padding:1rem;}
+    .title {color:#004080;font-weight:bold;text-align:center;}
+    .subtitle {color:#0066cc;margin-bottom:1rem;text-align:center;}
+    .footer {color:#555;font-size:14px;text-align:center;margin-top:2rem;}
+    .stButton>button {background:#004080;color:white;width:100%;}
+    @media (max-width:768px){
+        .title{font-size:1.8rem;}
+        .subtitle{font-size:1rem;}
+        [data-testid="metric-container"]{font-size:1rem;}
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# ========================
-# Google Sheets Authentication
-# ========================
-creds_info = st.secrets["google_service_account"]
-creds = Credentials.from_service_account_info(
-    creds_info,
-    scopes=["https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"]
-)
-client = gspread.authorize(creds)
+# ----------------------
+# Header
+# ----------------------
+if os.path.exists("college_logo.png"):
+    st.image("college_logo.png", width=120, use_column_width="auto")
+st.markdown('<div class="title">Department of Life Sciences</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Continuous Assessment Dashboard</div>', unsafe_allow_html=True)
 
-# ========================
-# Google Sheets IDs
-# ========================
-SHEET_IDS = {
-    "BTS101": "1bxIkhxyP3jmvb8AsYDqx-rK5HDzhJO7q4wky1QkSPHk",
-    "BTS306": "1El3R6gKLfs3tb_o8lJYzqna5JQ9Q3JJitc0uVDDKkv0"
+# ----------------------
+# Local Excel files
+# ----------------------
+excel_files = {
+    "BTS101": "BTS101.CA.xlsx",
+    "BTS306": "BTS306.CA.xlsx"
 }
 
-# ========================
-# Sidebar for Student Input
-# ========================
-st.sidebar.header("Student Login")
-student_number = st.sidebar.text_input("Enter your Student Number:")
+# ----------------------
+# Load + melt (cached)
+# ----------------------
+@st.cache_data
+def load_data():
+    dfs = []
+    for subj, path in excel_files.items():
+        if not os.path.exists(path):
+            st.warning(f"Missing {path}")
+            continue
+        df = pd.read_excel(path)
+        keep = ["Student No", "Name", "Gender"]
+        mark_cols = [c for c in df.columns if re.search(r"\(\d+\)", c)]
+        melted = df.melt(id_vars=keep, value_vars=mark_cols,
+                         var_name="Assessment_Type", value_name="Marks_Obtained")
+        melted["Max_Marks"] = melted["Assessment_Type"].str.extract(r"\((\d+)\)").astype(float)
+        melted["Subject"] = subj
+        melted.rename(columns={"Student No":"Student_Number"}, inplace=True)
+        dfs.append(melted)
+    if not dfs: st.stop()
+    data = pd.concat(dfs, ignore_index=True)
+    data["Percentage"] = (data["Marks_Obtained"]/data["Max_Marks"]*100).round(2)
+    return data
 
-selected_course = st.sidebar.selectbox("Select Course:", list(SHEET_IDS.keys()))
+df = load_data()
+st.success(f"Loaded {len(df)} rows from {df['Subject'].nunique()} subject(s)")
 
-# ========================
-# Load Sheet Data
-# ========================
-def load_sheet(sheet_id):
-    try:
-        sheet = client.open_by_key(sheet_id).sheet1
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        return df
-    except Exception as e:
-        st.error(f"Error loading sheet: {e}")
-        return pd.DataFrame()
+# ----------------------
+# Sidebar – Student login
+# ----------------------
+st.sidebar.header("Student Access")
+subject = st.sidebar.selectbox("Select Subject", options=sorted(df["Subject"].unique()))
+student_no = st.sidebar.text_input("Student Number", type="password")
 
-if student_number:
-    df_course = load_sheet(SHEET_IDS[selected_course])
-    if not df_course.empty:
-        df_student = df_course[df_course["Student Number"] == student_number]
-        if not df_student.empty:
-            st.markdown(
-                f"<h3 style='color:#4CAF50;'>CA Marks for Student Number: {student_number}</h3>",
-                unsafe_allow_html=True
-            )
-            st.dataframe(df_student, use_container_width=True)
-        else:
-            st.warning("No records found for this Student Number.")
-else:
-    st.info("Enter your Student Number in the sidebar to view your CA marks.")
+if student_no and subject:
+    filt = df[(df["Subject"]==subject) & (df["Student_Number"].astype(str)==student_no)]
+    if filt.empty:
+        st.warning(f"No record for **{subject}** – Student No **{student_no}**")
+    else:
+        name = filt["Name"].iloc[0]
+        st.success(f"**{name}** – {subject}")
 
-# ========================
+        # ---- Metrics ----
+        col1,col2,col3 = st.columns(3)
+        avg = filt["Percentage"].mean()
+        col1.metric("Average", f"{avg:.1f}%")
+        col2.metric("Assessments", len(filt))
+        col3.metric("Status", "Pass" if avg>=50 else "At Risk", delta=None)
+
+        # ---- Table ----
+        disp = filt[["Assessment_Type","Marks_Obtained","Max_Marks","Percentage"]]
+        st.markdown("### Your Marks")
+        st.dataframe(disp.style.format({"Percentage":"{:.1f}%"}), use_container_width=True)
+
+        # ---- Bar ----
+        fig_bar = px.bar(disp, x="Assessment_Type", y="Percentage",
+                         title="Performance %", color_discrete_sequence=["#0066cc"])
+        fig_bar.add_hline(y=50, line_dash="dash", line_color="red")
+        fig_bar.update_layout(height=300)
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # ---- Pie ----
+        fig_pie = px.pie(disp, values="Percentage", names="Assessment_Type",
+                         title="Breakdown", hole=.3)
+        fig_pie.update_layout(height=300)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+# ----------------------
 # Footer
-# ========================
-st.markdown(
-    """
-    <div style="text-align:center; margin-top:30px; color: gray; font-size:12px;">
-        Developed using AI tools by Bimal K Chetri (PhD) | Department of Life Sciences
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# ----------------------
+st.markdown("""
+<div class="footer">
+    Developed by Dr. Bimal K. Chetri (PhD) | © 2025 | CNR Bhutan
+</div>
+""", unsafe_allow_html=True)
+PY
