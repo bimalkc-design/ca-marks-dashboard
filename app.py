@@ -29,7 +29,7 @@ st.markdown("""
 <div class="header-box">
     <img src="college_logo.png" width="80">
     <div>
-        <div class="title">Sherubtse College</div>
+        <div class="title">BSc. in Life Science- Module</div>
         <div class="subtitle">Continuous Assessment Results</div>
     </div>
 </div>
@@ -95,7 +95,7 @@ if student_input and subject:
     if clean.startswith("0") and len(clean) == 8:
         candidates.add(clean[1:])
     filt = df[(df["Subject"] == subject) & (df["Student_Number"].isin(candidates))]
-    
+
     if filt.empty:
         st.warning("No results found. Try with or without leading zero.")
     else:
