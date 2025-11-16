@@ -4,7 +4,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import os
 import re
 
 # ---------------------- Page Setup ----------------------
@@ -17,42 +16,47 @@ st.set_page_config(
 # ---------------------- CSS ----------------------
 st.markdown("""
 <style>
-.title {color: #003366; font-weight: bold; text-align: center; font-size: 2.8rem;}
-.subtitle {color: #0066cc; text-align: center; font-size: 1.4rem;}
-.header-box {background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);}
+.title {color: #003366; font-weight: bold; text-align: center; font-size: 2rem;}
+.subtitle {color: #0066cc; text-align: center; font-size: 1.2rem;}
+.header-box {display:flex; align-items:center; justify-content:center; gap:1rem; background:white; padding:0.5rem 1rem; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1);}
 .success-box {background: #d4edda; color: #155724; padding: 1rem; border-radius: 10px; font-size: 1.2rem; font-weight: bold; text-align: center;}
 .footer {color: #555; font-size: 1rem; text-align: center; margin-top: 2rem; font-style: italic;}
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------- Header ----------------------
-col1, col2, col3 = st.columns([1,2,1])
-with col2:
-    if os.path.exists("college_logo.png"):
-        st.image("college_logo.png", width=140)
-    st.markdown('<div class="header-box"><div class="title">Sherubtse College</div>'
-                '<div class="subtitle">Continuous Assessment Results</div></div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="header-box">
+    <img src="college_logo.png" width="80">
+    <div>
+        <div class="title">Sherubtse College</div>
+        <div class="subtitle">Continuous Assessment Results</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------------- Excel Files ----------------------
+# Use GitHub raw URLs if deploying on Streamlit Cloud
 excel_files = {
-    "BTS101": "BTS101.CA.xlsx",
-    "BTS306": "BTS306.CA.xlsx"
+    "BTS101": "https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/BTS101.CA.xlsx",
+    "BTS306": "https://raw.githubusercontent.com/bimalkc-design/ca-marks-dashboard/main/BTS306.CA.xlsx"
 }
 
 # ---------------------- Load Data ----------------------
 @st.cache_data(ttl=3600)
 def load_data():
     dfs = []
-    for subj, file in excel_files.items():
-        if not os.path.exists(file):
-            st.warning(f"File not found: {file}")
+    for subj, url in excel_files.items():
+        try:
+            df = pd.read_excel(url, dtype={"Student No": str}, engine='openpyxl')
+        except Exception as e:
+            st.warning(f"Could not load {subj}: {e}")
             continue
-        df = pd.read_excel(file, dtype={"Student No": str})
         df["Student No"] = df["Student No"].str.strip()
         keep_cols = ["Student No", "Name", "Gender"]
         marks_cols = [c for c in df.columns if re.search(r"\(\d+\)", c)]
         if not marks_cols:
-            st.warning(f"No assessment columns in {file}")
+            st.warning(f"No assessment columns in {subj}")
             continue
         melted = df.melt(id_vars=keep_cols, value_vars=marks_cols,
                          var_name="Assessment_Type", value_name="Marks_Obtained")
@@ -70,17 +74,17 @@ def load_data():
 
 df = load_data()
 
-# ---------------------- Sidebar Login ----------------------
-with st.sidebar:
-    st.markdown("### 🎓 Student Login")
-    if df.empty:
-        st.error("No data loaded. Please upload Excel files.")
-        st.stop()
-    subject_list = sorted(df["Subject"].unique())
-    subject = st.selectbox("Select Module", subject_list)
-    student_input = st.text_input("Enter Student No", placeholder="e.g., 07250087", type="password")
-    st.markdown("---")
-    st.caption("🔒 Secure & Private • View Only")
+# ---------------------- Student Login (Main Page) ----------------------
+st.markdown("### 🎓 Student Login")
+if df.empty:
+    st.error("No data loaded. Please upload Excel files.")
+    st.stop()
+
+subject_list = sorted(df["Subject"].unique())
+subject = st.selectbox("Select Module", subject_list)
+student_input = st.text_input("Enter Student No", placeholder="e.g., 07250087", type="password")
+st.markdown("---")
+st.caption("🔒 Secure & Private • View Only")
 
 # ---------------------- Process Login ----------------------
 if student_input and subject:
@@ -91,6 +95,7 @@ if student_input and subject:
     if clean.startswith("0") and len(clean) == 8:
         candidates.add(clean[1:])
     filt = df[(df["Subject"] == subject) & (df["Student_Number"].isin(candidates))]
+    
     if filt.empty:
         st.warning("No results found. Try with or without leading zero.")
     else:
