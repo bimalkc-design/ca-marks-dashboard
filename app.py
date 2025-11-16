@@ -66,13 +66,14 @@ excel_files = {
 # Load Data – Exact Match from Excel
 # ----------------------
 @st.cache_data
+@st.cache_data
 def load_data():
     dfs = []
     for subj, path in excel_files.items():
         if not os.path.exists(path):
             st.warning(f"⚠️ File not found: {path}")
             continue
-        df = pd.read_excel(path)
+        df = pd.read_excel(path, dtype={"Student No": str})
         keep = ["Student No", "Name", "Gender"]
         mark_cols = [c for c in df.columns if re.search(r"\(\d+\)", c)]
         if not mark_cols:
@@ -80,6 +81,8 @@ def load_data():
         melted = df.melt(id_vars=keep, value_vars=mark_cols,
                          var_name="Assessment_Type", value_name="Marks_Obtained")
         melted["Max_Marks"] = melted["Assessment_Type"].str.extract(r"\((\d+)\)").astype(float)
+        melted["Marks_Obtained"] = pd.to_numeric(melted["Marks_Obtained"], errors="coerce")
+        melted = melted.dropna(subset=["Marks_Obtained"])
         melted["Subject"] = subj
         melted["Student_Number"] = melted["Student No"].astype(str).str.strip()
         dfs.append(melted)
