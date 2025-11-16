@@ -65,29 +65,34 @@ excel_files = {
 # ----------------------
 # Load Data – Exact Match from Excel
 # ----------------------
-@st.cache_data
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_data():
     dfs = []
-    for subj, path in excel_files.items():
+    base_path = "."  # Streamlit Cloud root
+    for subj, filename in excel_files.items():
+        path = os.path.join(base_path, filename)
         if not os.path.exists(path):
-            st.warning(f"⚠️ File not found: {path}")
+            st.error(f"File not found: {filename}. Contact Dr. Bimal.")
             continue
-        df = pd.read_excel(path, dtype={"Student No": str})
-        keep = ["Student No", "Name", "Gender"]
-        mark_cols = [c for c in df.columns if re.search(r"\(\d+\)", c)]
-        if not mark_cols:
-            continue
-        melted = df.melt(id_vars=keep, value_vars=mark_cols,
-                         var_name="Assessment_Type", value_name="Marks_Obtained")
-        melted["Max_Marks"] = melted["Assessment_Type"].str.extract(r"\((\d+)\)").astype(float)
-        melted["Marks_Obtained"] = pd.to_numeric(melted["Marks_Obtained"], errors="coerce")
-        melted = melted.dropna(subset=["Marks_Obtained"])
-        melted["Subject"] = subj
-        melted["Student_Number"] = melted["Student No"].astype(str).str.strip()
-        dfs.append(melted)
+        try:
+            df = pd.read_excel(path, dtype={"Student No": str})
+            keep = ["Student No", "Name", "Gender"]
+            mark_cols = [c for c in df.columns if re.search(r"\(\d+\)", c)]
+            if not mark_cols:
+                st.warning(f"No assessment columns in {filename}")
+                continue
+            melted = df.melt(id_vars=keep, value_vars=mark_cols,
+                             var_name="Assessment_Type", value_name="Marks_Obtained")
+            melted["Max_Marks"] = melted["Assessment_Type"].str.extract(r"\((\d+)\)").astype(float)
+            melted["Marks_Obtained"] = pd.to_numeric(melted["Marks_Obtained"], errors="coerce")
+            melted = melted.dropna(subset=["Marks_Obtained"])
+            melted["Subject"] = subj
+            melted["Student_Number"] = melted["Student No"].astype(str).str.strip()
+            dfs.append(melted)
+        except Exception as e:
+            st.error(f"Error reading {filename}: {e}")
     if not dfs:
-        st.error("No data available. Contact faculty.")
+        st.error("No data loaded. Please try again later.")
         st.stop()
     data = pd.concat(dfs, ignore_index=True)
     data["Percentage"] = (data["Marks_Obtained"] / data["Max_Marks"] * 100).round(2)
