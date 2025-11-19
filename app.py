@@ -25,15 +25,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------- Header ----------------------
-st.markdown("""
-<div class="header-box">
-    <img src="college_logo.png" width="80">
-    <div>
-        <div class="title">BSc. in Life Science- Module</div>
-        <div class="subtitle">Continuous Assessment Results</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ---------------------- Header ----------------------
+col1, col2 = st.columns([1, 4])
+with col1:
+    st.image("college_logo.png", width=100)  # Adjust width as needed
+
+with col2:
+    st.markdown('<div class="title">BSc. in Life Science - Module</div>'
+                '<div class="subtitle">Continuous Assessment Results</div>', unsafe_allow_html=True)
+
 
 # ---------------------- Excel Files ----------------------
 # Use GitHub raw URLs if deploying on Streamlit Cloud
